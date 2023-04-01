@@ -1,16 +1,20 @@
 use chrono::{Utc, DateTime};
-use serde::{Serialize};
 use chrono::serde::ts_seconds_option;
 
-struct Ambient {
+use serde::{Serialize};
+use reqwest::blocking::Client;
+use reqwest::header::CONTENT_TYPE;
+
+pub struct Ambient {
     channel_id : u32,
     write_key : String, 
-    read_key: Option<String>, 
-    user_key: Option<String>,
-    url: String
+    //read_key: Option<String>, 
+    //user_key: Option<String>,
+    url: String, 
+    client: Client,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct AmbientPayload {
     #[serde(with = "ts_seconds_option", skip_serializing_if = "Option::is_none")]
     pub created: Option<DateTime<Utc>>,  //TODO fix time serialize format.
@@ -33,20 +37,21 @@ pub struct AmbientPayload {
 }
 
 impl Ambient {
-    fn new(channel_id: u32, write_key: String) -> Ambient {
+    pub fn new(channel_id: u32, write_key: String) -> Ambient {
         Ambient {
             channel_id,
             write_key,
-            read_key: None,
-            user_key: None,
+            //read_key: None,
+            //user_key: None,
             url: String::from("http://ambidata.io/api/v2/channels/"),
+            client : reqwest::blocking::Client::new(),
         }
     }
 
-    fn send(&self, payload: &AmbientPayload, timeout_ms: Option<u32> ) {
+    pub fn send(&self, payload: &AmbientPayload, timeout_ms: Option<u32> ) {
         let mut url: String = self.url.clone();
         url.push_str(&self.channel_id.to_string());
-        let json = serde_json::to_string(&payload).unwrap();
+        url.push_str("/dataarray");
 
         let default_timeout_ms = 3000;
 
@@ -55,17 +60,37 @@ impl Ambient {
             Some(x) => x,
         };
 
+        #[allow(non_snake_case)]
+        #[derive(Serialize, Debug)]
+        struct DataArray{
+            writeKey: String,
+            data: Vec<AmbientPayload> ,
+        }
+        let data_array = DataArray{
+            writeKey : self.write_key.clone(),
+            data : vec![payload.clone(); 1],
+        };
+
+        let json = serde_json::to_string(&data_array).unwrap();
+
         //debug pring
         println!("write key: {}", self.write_key);
         println!("json     : {}", json);
         println!("url      : {}", url);
         println!("timeout  : {} ms", timeout);
 
-        // TODO: create request.
-        // TODO: post sensor data.
+        // post sensor data.
+        let _res = self.client.post(url)
+            .header(CONTENT_TYPE, "application/json")
+            .body(json)
+            .send();
+
     }
 
 }
+
+
+
 
 #[cfg(test)]
 mod tests {
@@ -73,12 +98,16 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let ambient = Ambient::new(123, String::from("12345"));
+        const CHANNEL_ID: u32 = 12345;
+        const WRITE_KEY: &str = "12345";
+
+        let ambient = Ambient::new(CHANNEL_ID, String::from(WRITE_KEY));
         let payload = AmbientPayload {
-            created: Some(Utc::now()),
-            d1: Some(123.4),
-            d2: Some(567.8),
-            d3: None,
+            //created: Some(Utc::now()),
+            created: None,
+            d1: Some(12.3),
+            d2: Some(45.6),
+            d3: Some(78.9),
             d4: None,
             d5: None,
             d6: None,
