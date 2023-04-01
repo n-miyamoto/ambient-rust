@@ -4,7 +4,7 @@ use chrono::serde::ts_seconds_option;
 use serde::{Serialize};
 use reqwest::blocking::Client;
 use reqwest::header::CONTENT_TYPE;
-
+use reqwest::StatusCode;
 pub struct Ambient {
     channel_id : u32,
     write_key : String, 
@@ -49,12 +49,9 @@ impl Ambient {
     }
 
     pub fn send(&self, payload: &AmbientPayload, timeout_ms: Option<u32> ) {
-        let mut url: String = self.url.clone();
-        url.push_str(&self.channel_id.to_string());
-        url.push_str("/dataarray");
+        let url: String = self.url.clone() + &self.channel_id.to_string() + "/dataarray";
 
         let default_timeout_ms = 3000;
-
         let timeout = match timeout_ms {
             None => default_timeout_ms,
             Some(x) => x,
@@ -73,7 +70,7 @@ impl Ambient {
 
         let json = serde_json::to_string(&data_array).unwrap();
 
-        //debug pring
+        //debug print
         println!("write key: {}", self.write_key);
         println!("json     : {}", json);
         println!("url      : {}", url);
@@ -84,13 +81,16 @@ impl Ambient {
             .header(CONTENT_TYPE, "application/json")
             .body(json)
             .send();
-
+        //match res.status() {
+        //    StatusCode::OK => println!("success!"),
+        //    StatusCode::PAYLOAD_TOO_LARGE => {
+        //        println!("Request payload is too large!");
+        //    }
+        //    s => println!("Received response status: {:?}", s),
+        //};
     }
 
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
