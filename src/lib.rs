@@ -1,10 +1,8 @@
-use chrono::{Utc, DateTime};
-use chrono::serde::ts_seconds_option;
-
+use std::time::Duration;
+use chrono::{Utc, DateTime, serde::ts_seconds_option};
 use serde::{Serialize};
-use reqwest::blocking::Client;
-use reqwest::header::CONTENT_TYPE;
-use reqwest::StatusCode;
+use reqwest::{blocking::{Client, Response}, Error, header::CONTENT_TYPE};
+
 pub struct Ambient {
     channel_id : u32,
     write_key : String, 
@@ -48,10 +46,10 @@ impl Ambient {
         }
     }
 
-    pub fn send(&self, payload: &AmbientPayload, timeout_ms: Option<u32> ) {
+    pub fn send(&self, payload: &AmbientPayload, timeout_ms: Option<u64> ) -> Result<Response, Error>{
         let url: String = self.url.clone() + &self.channel_id.to_string() + "/dataarray";
 
-        let default_timeout_ms = 3000;
+        let default_timeout_ms = 10_000;
         let timeout = match timeout_ms {
             None => default_timeout_ms,
             Some(x) => x,
@@ -67,27 +65,16 @@ impl Ambient {
             writeKey : self.write_key.clone(),
             data : vec![payload.clone(); 1],
         };
-
         let json = serde_json::to_string(&data_array).unwrap();
 
-        //debug print
-        println!("write key: {}", self.write_key);
-        println!("json     : {}", json);
-        println!("url      : {}", url);
-        println!("timeout  : {} ms", timeout);
-
         // post sensor data.
-        let _res = self.client.post(url)
+        let res = self.client.post(url)
+            .timeout(Duration::from_millis(timeout))
             .header(CONTENT_TYPE, "application/json")
             .body(json)
-            .send();
-        //match res.status() {
-        //    StatusCode::OK => println!("success!"),
-        //    StatusCode::PAYLOAD_TOO_LARGE => {
-        //        println!("Request payload is too large!");
-        //    }
-        //    s => println!("Received response status: {:?}", s),
-        //};
+            .send()?;
+
+        Ok(res)
     }
 
 }
@@ -95,19 +82,21 @@ impl Ambient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use reqwest::StatusCode;
 
     #[test]
     fn it_works() {
         const CHANNEL_ID: u32 = 12345;
-        const WRITE_KEY: &str = "12345";
+        const WRITE_KEY: &str = "1234";
+        let dummy_data = vec![12.3, 45.6, 78.9];
 
         let ambient = Ambient::new(CHANNEL_ID, String::from(WRITE_KEY));
         let payload = AmbientPayload {
-            //created: Some(Utc::now()),
+            //created: Some(Utc::now()), Persing chrono::DataTime is not supported yes.
             created: None,
-            d1: Some(12.3),
-            d2: Some(45.6),
-            d3: Some(78.9),
+            d1: Some(dummy_data[0]),
+            d2: Some(dummy_data[1]),
+            d3: Some(dummy_data[2]),
             d4: None,
             d5: None,
             d6: None,
@@ -115,8 +104,22 @@ mod tests {
             d8: None,
         };
 
-        ambient.send(&payload, None);
+        let response = ambient.send(&payload, None);
+        match &response{
+            Ok(res) =>  {
+                match res.status() {
+                    StatusCode::OK => println!("success!"),
+                    StatusCode::PAYLOAD_TOO_LARGE => {
+                        println!("Request payload is too large!");
+                    }
+                    s => println!("Received response status: {:?}", s),
+                };
+            },
+            Err(error) => {
+                panic!("Http post failled.: {:?}", error);
+            }
+        }
 
-        //assert_eq!(result, 4);
+        assert_eq!(response.unwrap().status(), StatusCode::NOT_FOUND);
     }
 }
