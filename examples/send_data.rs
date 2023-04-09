@@ -1,9 +1,10 @@
 use ambient_rust::{Ambient, AmbientPayload};
-use reqwest::StatusCode;
+use reqwest::{StatusCode, Error};
 
 mod secrets;
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     //const CHANNEL_ID: u32 = 12345;
     //const WRITE_KEY: &str = "1234";
     let dummy_data = vec![12.3, 45.6, 78.9];
@@ -22,21 +23,16 @@ fn main() {
         d8: None,
     };
 
-    let response = ambient.send(&payload, None);
-    match &response{
-        Ok(res) =>  {
-            match res.status() {
-                StatusCode::OK => println!("success!"),
-                StatusCode::PAYLOAD_TOO_LARGE => {
-                    println!("Request payload is too large!");
-                }
-                s => println!("Received response status: {:?}", s),
-            };
-        },
-        Err(error) => {
-            panic!("Http post failled.: {:?}", error);
-        }
-    }
+    let response = ambient.send(&payload, None).await?;
 
-    assert_eq!(response.unwrap().status(), StatusCode::OK);
+    match response.status() {
+        StatusCode::OK => println!("success!"),
+        StatusCode::PAYLOAD_TOO_LARGE => {
+            println!("Request payload is too large!");
+        }
+        s => println!("Received response status: {:?}", s),
+    };
+    assert_eq!(response.status(), StatusCode::OK);
+
+    Ok(())
 }
