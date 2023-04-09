@@ -2,6 +2,7 @@ use std::time::Duration;
 use chrono::{Utc, DateTime, serde::ts_seconds_option};
 use serde::{Serialize};
 use reqwest::{Client, Response, Error, header::CONTENT_TYPE};
+use std::fmt::{self, Formatter, Display};
 
 pub struct Ambient {
     channel_id : u32,
@@ -32,6 +33,12 @@ pub struct AmbientPayload {
     pub d7: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub d8: Option<f64>,
+}
+
+impl Display for AmbientPayload {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", serde_json::to_string(&self).unwrap())
+    }
 }
 
 impl Ambient {

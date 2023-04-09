@@ -23,6 +23,8 @@ async fn main() -> Result<(), Error> {
         d8: None,
     };
 
+    println!("{}", payload);
+
     let response = ambient.send(&payload, None).await?;
 
     match response.status() {
